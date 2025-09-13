@@ -34,6 +34,8 @@ export interface TransactionSummary {
     date: string;
     hash: string;
   }>;
+  isLimitedSample: boolean;
+  sampleSize: number;
 }
 
 export const analyzeWalletWithAI = async (transactions: EtherscanTransaction[], walletAddress: string): Promise<WalletAnalysis> => {
@@ -64,11 +66,14 @@ export const analyzeWalletWithAI = async (transactions: EtherscanTransaction[], 
           Your role is to provide comprehensive, actionable insights about wallet activity patterns, 
           user behavior, and potential use cases based on transaction history. 
           
+          IMPORTANT: Be transparent about data limitations. If you're analyzing a limited sample of recent transactions, 
+          clearly state this in your analysis and note that the wallet may have a much longer history.
+          
           Always structure your response as a JSON object with the following format:
           {
-            "summary": "A concise 2-3 sentence overview of the wallet's primary characteristics",
-            "insights": ["Array of 3-5 key behavioral insights"],
-            "behaviorPattern": "Detailed analysis of transaction patterns and user behavior",
+            "summary": "A concise 2-3 sentence overview of the wallet's primary characteristics, noting if analysis is based on limited data",
+            "insights": ["Array of 3-5 key behavioral insights, mentioning data limitations when relevant"],
+            "behaviorPattern": "Detailed analysis of transaction patterns and user behavior, acknowledging sample limitations if applicable",
             "riskAssessment": "Assessment of wallet activity from security and compliance perspective",
             "recommendations": ["Array of 2-4 actionable recommendations for the wallet holder"]
           }`
@@ -149,18 +154,24 @@ const prepareTransactionData = (transactions: EtherscanTransaction[], walletAddr
     averageTransactionValue: averageValue,
     uniqueCounterparties: counterparties.size,
     transactionFrequency: frequency,
-    recentTransactions: recentTxs
+    recentTransactions: recentTxs,
+    isLimitedSample: transactions.length >= 100, // If we got 100+ transactions, likely hitting API limit
+    sampleSize: transactions.length
   };
 };
 
 const createAnalysisPrompt = (data: TransactionSummary): string => {
+  const sampleNote = data.isLimitedSample 
+    ? `\n⚠️  IMPORTANT: This analysis is based on the most recent ${data.sampleSize} transactions only. The wallet may have significantly more transaction history.`
+    : '';
+
   return `Analyze this Ethereum wallet's transaction history and provide comprehensive insights:
 
 WALLET OVERVIEW:
 - Address: ${data.address}
-- Total Transactions: ${data.totalTransactions}
+- Transactions Analyzed: ${data.totalTransactions}${data.isLimitedSample ? ` (limited sample - wallet likely has more history)` : ` (complete history)`}
 - Active Period: ${data.firstTransactionDate.split('T')[0]} to ${data.lastTransactionDate.split('T')[0]}
-- Transaction Frequency: ${data.transactionFrequency}
+- Transaction Frequency: ${data.transactionFrequency}${sampleNote}
 
 TRANSACTION SUMMARY:
 - Total ETH Sent: ${data.totalEthSent.toFixed(4)} ETH (${data.outgoingCount} transactions)
@@ -181,6 +192,7 @@ ANALYSIS REQUIREMENTS:
 4. Determine if this appears to be a personal wallet, exchange, smart contract, or institutional wallet
 5. Identify any notable patterns in counterparty interactions
 6. Provide actionable insights for optimization or security
+${data.isLimitedSample ? '\n7. IMPORTANT: Acknowledge in your analysis that this is based on recent transaction history only' : ''}
 
-Please provide a comprehensive analysis focusing on behavioral patterns, usage characteristics, and practical recommendations.`;
+Please provide a comprehensive analysis focusing on behavioral patterns, usage characteristics, and practical recommendations.${data.isLimitedSample ? ' Note that your analysis is based on recent transactions and the wallet may have a much longer history.' : ''}`;
 };

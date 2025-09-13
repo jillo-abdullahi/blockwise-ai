@@ -33,7 +33,7 @@ export interface EtherscanResponse {
 }
 
 export const etherscanApi = {
-  async getTransactions(address: string, page = 1, offset = 50): Promise<EtherscanTransaction[]> {
+  async getTransactions(address: string, page = 1, offset = 100): Promise<EtherscanTransaction[]> {
     if (!API_KEY) {
       throw new Error('Etherscan API key is not configured. Please add VITE_ETHERSCAN_API_KEY to your .env file.');
     }
