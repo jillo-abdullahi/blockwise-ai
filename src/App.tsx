@@ -1,20 +1,46 @@
 import { useState } from "react";
+import { isAddress } from "ethers";
 import Navbar from "./components/Navbar";
 import { useWalletTransactions } from "./hooks/useEtherscan";
 
 function App() {
   const [walletAddress, setWalletAddress] = useState("");
-  const [shouldAnalyze, setShouldAnalyze] = useState(false);
+  const [analyzedAddress, setAnalyzedAddress] = useState("");
+  const [validationError, setValidationError] = useState("");
 
   const { 
     data: transactions, 
     isLoading: isAnalyzing, 
     error 
-  } = useWalletTransactions(walletAddress, shouldAnalyze);
+  } = useWalletTransactions(analyzedAddress, !!analyzedAddress);
+
+  const validateAddress = (address: string): boolean => {
+    if (!address.trim()) {
+      setValidationError("Please enter an Ethereum address");
+      return false;
+    }
+    
+    if (!isAddress(address)) {
+      setValidationError("Please enter a valid Ethereum address");
+      return false;
+    }
+    
+    setValidationError("");
+    return true;
+  };
 
   const handleAnalyzeWallet = () => {
-    if (!walletAddress.trim()) return;
-    setShouldAnalyze(true);
+    if (validateAddress(walletAddress)) {
+      setAnalyzedAddress(walletAddress);
+    }
+  };
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setWalletAddress(e.target.value);
+    // Clear validation error when user starts typing
+    if (validationError) {
+      setValidationError("");
+    }
   };
 
   const formatTransactionValue = (valueWei: string) => {
@@ -34,20 +60,20 @@ function App() {
     
     let analysisText = `WALLET ANALYSIS RESULTS\n`;
     analysisText += `========================\n\n`;
-    analysisText += `Address: ${walletAddress}\n`;
+    analysisText += `Address: ${analyzedAddress}\n`;
     analysisText += `Total Transactions Found: ${totalTransactions}\n\n`;
     
     if (totalTransactions > 0) {
       const totalValueOut = transactions
-        .filter(tx => tx.from.toLowerCase() === walletAddress.toLowerCase())
+        .filter(tx => tx.from.toLowerCase() === analyzedAddress.toLowerCase())
         .reduce((sum, tx) => sum + parseFloat(tx.value), 0);
       
       const totalValueIn = transactions
-        .filter(tx => tx.to.toLowerCase() === walletAddress.toLowerCase())
+        .filter(tx => tx.to.toLowerCase() === analyzedAddress.toLowerCase())
         .reduce((sum, tx) => sum + parseFloat(tx.value), 0);
 
-      const outgoingTxCount = transactions.filter(tx => tx.from.toLowerCase() === walletAddress.toLowerCase()).length;
-      const incomingTxCount = transactions.filter(tx => tx.to.toLowerCase() === walletAddress.toLowerCase()).length;
+      const outgoingTxCount = transactions.filter(tx => tx.from.toLowerCase() === analyzedAddress.toLowerCase()).length;
+      const incomingTxCount = transactions.filter(tx => tx.to.toLowerCase() === analyzedAddress.toLowerCase()).length;
 
       analysisText += `TRANSACTION SUMMARY:\n`;
       analysisText += `- Outgoing Transactions: ${outgoingTxCount}\n`;
@@ -60,7 +86,7 @@ function App() {
       analysisText += `====================================\n`;
       
       recentTransactions.forEach((tx, index) => {
-        const isOutgoing = tx.from.toLowerCase() === walletAddress.toLowerCase();
+        const isOutgoing = tx.from.toLowerCase() === analyzedAddress.toLowerCase();
         const direction = isOutgoing ? "OUT" : "IN ";
         const otherAddress = isOutgoing ? tx.to : tx.from;
         const value = formatTransactionValue(tx.value);
@@ -99,13 +125,22 @@ function App() {
               Enter Ethereum Address
             </h2>
             <div className="flex flex-col sm:flex-row gap-4 max-w-2xl mx-auto">
-              <input
-                type="text"
-                placeholder="0x742d35Cc6634C0532925a3b8D25d9E6c0e5c8C8E"
-                value={walletAddress}
-                onChange={(e) => setWalletAddress(e.target.value)}
-                className="flex-1 px-4 py-3 bg-slate-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="0x742d35Cc6634C0532925a3b8D25d9E6c0e5c8C8E"
+                  value={walletAddress}
+                  onChange={handleAddressChange}
+                  className={`w-full px-4 py-3 bg-slate-700/50 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+                    validationError 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-gray-600 focus:ring-blue-500'
+                  }`}
+                />
+                {validationError && (
+                  <p className="mt-2 text-sm text-red-400">{validationError}</p>
+                )}
+              </div>
               <button
                 className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 onClick={handleAnalyzeWallet}
