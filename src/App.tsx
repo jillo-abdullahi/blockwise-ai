@@ -180,11 +180,12 @@ function App() {
           </div>
 
           {/* Analysis Results Section */}
-          <div
-            ref={resultsRef}
-            className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-3xl p-8"
-          >
-            {analysisResults ? (
+          {(analysisResults || transactionError) && (
+            <div
+              ref={resultsRef}
+              className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-3xl p-8"
+            >
+              {analysisResults ? (
               <>
                 <h2 className="text-2xl font-semibold text-white mb-2">
                   AI-Powered Analysis Results
@@ -192,14 +193,14 @@ function App() {
                 <div className="mb-6">
                   <p className="text-sm text-gray-400">
                     Analysis for:{" "}
-                    <span className="text-blue-400 font-mono">
+                    <span className="text-blue-400 font-mono break-all">
                       {analyzedInput}
                     </span>
                   </p>
                   {analyzedInput !== analyzedAddress && (
                     <p className="text-xs text-gray-500 mt-1">
-                      Resolved to: {analyzedAddress.slice(0, 6)}...
-                      {analyzedAddress.slice(-4)}
+                      Resolved to: <span className="font-mono">{analyzedAddress.slice(0, 6)}...
+                      {analyzedAddress.slice(-4)}</span>
                     </p>
                   )}
                 </div>
@@ -209,7 +210,7 @@ function App() {
                     <h3 className="text-lg font-semibold text-blue-400 mb-2">
                       Summary
                     </h3>
-                    <p className="text-gray-300">{analysisResults.summary}</p>
+                    <p className="text-gray-300 break-words">{analysisResults.summary}</p>
                   </div>
 
                   {/* Key Insights */}
@@ -224,8 +225,8 @@ function App() {
                             key={index}
                             className="flex items-start space-x-2"
                           >
-                            <span className="text-purple-400 mt-1">•</span>
-                            <span className="text-gray-300">{insight}</span>
+                            <span className="text-purple-400 mt-1 flex-shrink-0">•</span>
+                            <span className="text-gray-300 break-words">{insight}</span>
                           </li>
                         )
                       )}
@@ -237,7 +238,7 @@ function App() {
                     <h3 className="text-lg font-semibold text-green-400 mb-2">
                       Behavior Pattern
                     </h3>
-                    <p className="text-gray-300">
+                    <p className="text-gray-300 break-words">
                       {analysisResults.behaviorPattern}
                     </p>
                   </div>
@@ -247,7 +248,7 @@ function App() {
                     <h3 className="text-lg font-semibold text-yellow-400 mb-2">
                       Risk Assessment
                     </h3>
-                    <p className="text-gray-300">
+                    <p className="text-gray-300 break-words">
                       {analysisResults.riskAssessment}
                     </p>
                   </div>
@@ -264,8 +265,8 @@ function App() {
                             key={index}
                             className="flex items-start space-x-2"
                           >
-                            <span className="text-cyan-400 mt-1">→</span>
-                            <span className="text-gray-300">{rec}</span>
+                            <span className="text-cyan-400 mt-1 flex-shrink-0">→</span>
+                            <span className="text-gray-300 break-words">{rec}</span>
                           </li>
                         )
                       )}
@@ -428,7 +429,8 @@ function App() {
                 </div>
               </div>
             )}
-          </div>
+            </div>
+          )}
         </div>
       </main>
 
