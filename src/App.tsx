@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { isAddress } from "ethers";
 import Navbar from "./components/Navbar";
 import AnalysisModal from "./components/AnalysisModal";
@@ -9,11 +9,13 @@ import type { WalletAnalysis } from "./services/openaiApi";
 function App() {
   const [walletInput, setWalletInput] = useState(""); // What user types (address or ENS)
   const [analyzedAddress, setAnalyzedAddress] = useState("");
+  const [analyzedInput, setAnalyzedInput] = useState(""); // Store the original input (ENS name or address)
   const [validationError, setValidationError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<WalletAnalysis | null>(
     null
   );
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const {
     data: transactions,
@@ -29,6 +31,16 @@ function App() {
       setIsModalOpen(true);
     }
   }, [transactions]);
+
+  // Scroll to results when analysis is complete
+  useEffect(() => {
+    if (analysisResults && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  }, [analysisResults]);
 
   const validateAndResolveInput = async (input: string): Promise<{ isValid: boolean; address?: string; error?: string }> => {
     if (!input.trim()) {
@@ -66,6 +78,7 @@ function App() {
     const result = await validateAndResolveInput(walletInput);
     if (result.isValid && result.address) {
       setAnalyzedAddress(result.address);
+      setAnalyzedInput(walletInput); // Store the original input
       setAnalysisResults(null); // Clear previous results
     } else {
       setValidationError(result.error || "Invalid input");
@@ -74,6 +87,8 @@ function App() {
 
   const handleAnalysisComplete = (analysis: WalletAnalysis) => {
     setAnalysisResults(analysis);
+    // Close the modal when analysis is complete so user can see results
+    setIsModalOpen(false);
   };
 
   const handleCloseModal = () => {
@@ -145,12 +160,22 @@ function App() {
           </div>
 
           {/* Analysis Results Section */}
-          <div className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-3xl p-8">
+          <div ref={resultsRef} className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-3xl p-8">
             {analysisResults ? (
               <>
-                <h2 className="text-2xl font-semibold text-white mb-6">
+                <h2 className="text-2xl font-semibold text-white mb-2">
                   AI-Powered Analysis Results
                 </h2>
+                <div className="mb-6">
+                  <p className="text-sm text-gray-400">
+                    Analysis for: <span className="text-blue-400 font-mono">{analyzedInput}</span>
+                  </p>
+                  {analyzedInput !== analyzedAddress && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Resolved to: {analyzedAddress.slice(0, 6)}...{analyzedAddress.slice(-4)}
+                    </p>
+                  )}
+                </div>
                 <div className="text-left space-y-6">
                   {/* Summary */}
                   <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
