@@ -31,13 +31,6 @@ const Navbar: React.FC = () => {
               Blockwise AI
             </h1>
           </div>
-
-          {/* Connect Wallet Button */}
-          <div className="flex items-center">
-            <button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25">
-              Connect Wallet
-            </button>
-          </div>
         </div>
       </div>
     </nav>
