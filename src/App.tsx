@@ -1,21 +1,80 @@
 import { useState } from "react";
 import Navbar from "./components/Navbar";
+import { useWalletTransactions } from "./hooks/useEtherscan";
 
 function App() {
   const [walletAddress, setWalletAddress] = useState("");
-  const [analysisResults, setAnalysisResults] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [shouldAnalyze, setShouldAnalyze] = useState(false);
 
-  const handleAnalyzeWallet = async () => {
+  const { 
+    data: transactions, 
+    isLoading: isAnalyzing, 
+    error 
+  } = useWalletTransactions(walletAddress, shouldAnalyze);
+
+  const handleAnalyzeWallet = () => {
     if (!walletAddress.trim()) return;
+    setShouldAnalyze(true);
+  };
+
+  const formatTransactionValue = (valueWei: string) => {
+    const ethValue = parseFloat(valueWei) / Math.pow(10, 18);
+    return ethValue.toFixed(6);
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(parseInt(timestamp) * 1000).toLocaleString();
+  };
+
+  const generateAnalysisResults = () => {
+    if (!transactions) return null;
+
+    const totalTransactions = transactions.length;
+    const recentTransactions = transactions.slice(0, 10);
     
-    setIsAnalyzing(true);
-    // TODO: Implement actual wallet analysis
-    // Simulate API call for now
-    setTimeout(() => {
-      setAnalysisResults(`Analysis complete for wallet: ${walletAddress}\n\nThis wallet shows moderate activity with regular transactions. The portfolio consists mainly of ETH with some ERC-20 tokens. Recent activity suggests active trading behavior.`);
-      setIsAnalyzing(false);
-    }, 2000);
+    let analysisText = `WALLET ANALYSIS RESULTS\n`;
+    analysisText += `========================\n\n`;
+    analysisText += `Address: ${walletAddress}\n`;
+    analysisText += `Total Transactions Found: ${totalTransactions}\n\n`;
+    
+    if (totalTransactions > 0) {
+      const totalValueOut = transactions
+        .filter(tx => tx.from.toLowerCase() === walletAddress.toLowerCase())
+        .reduce((sum, tx) => sum + parseFloat(tx.value), 0);
+      
+      const totalValueIn = transactions
+        .filter(tx => tx.to.toLowerCase() === walletAddress.toLowerCase())
+        .reduce((sum, tx) => sum + parseFloat(tx.value), 0);
+
+      const outgoingTxCount = transactions.filter(tx => tx.from.toLowerCase() === walletAddress.toLowerCase()).length;
+      const incomingTxCount = transactions.filter(tx => tx.to.toLowerCase() === walletAddress.toLowerCase()).length;
+
+      analysisText += `TRANSACTION SUMMARY:\n`;
+      analysisText += `- Outgoing Transactions: ${outgoingTxCount}\n`;
+      analysisText += `- Incoming Transactions: ${incomingTxCount}\n`;
+      analysisText += `- Total ETH Sent: ${formatTransactionValue(totalValueOut.toString())} ETH\n`;
+      analysisText += `- Total ETH Received: ${formatTransactionValue(totalValueIn.toString())} ETH\n`;
+      analysisText += `- Most Recent Transaction: ${formatTimestamp(transactions[0].timeStamp)}\n\n`;
+      
+      analysisText += `RECENT TRANSACTIONS (Last 10):\n`;
+      analysisText += `====================================\n`;
+      
+      recentTransactions.forEach((tx, index) => {
+        const isOutgoing = tx.from.toLowerCase() === walletAddress.toLowerCase();
+        const direction = isOutgoing ? "OUT" : "IN ";
+        const otherAddress = isOutgoing ? tx.to : tx.from;
+        const value = formatTransactionValue(tx.value);
+        
+        analysisText += `${index + 1}. [${direction}] ${value} ETH\n`;
+        analysisText += `   ${isOutgoing ? 'To' : 'From'}: ${otherAddress}\n`;
+        analysisText += `   Date: ${formatTimestamp(tx.timeStamp)}\n`;
+        analysisText += `   Hash: ${tx.hash}\n\n`;
+      });
+    } else {
+      analysisText += `No transactions found for this address.\n`;
+    }
+
+    return analysisText;
   };
 
   return (
@@ -61,11 +120,20 @@ function App() {
           <div className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-2xl p-8">
             <h2 className="text-2xl font-semibold text-white mb-6">Analysis Results</h2>
             
-            {analysisResults ? (
+            {error ? (
+              <div className="text-center py-6">
+                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                  <h3 className="text-lg font-medium text-red-400 mb-2">Error</h3>
+                  <p className="text-red-300 text-sm">
+                    {error.message || 'Failed to fetch wallet data'}
+                  </p>
+                </div>
+              </div>
+            ) : transactions ? (
               <div className="text-left">
                 <div className="bg-slate-700/30 rounded-lg p-6 border border-gray-600">
                   <pre className="text-gray-300 whitespace-pre-wrap font-mono text-sm leading-relaxed">
-                    {analysisResults}
+                    {generateAnalysisResults()}
                   </pre>
                 </div>
               </div>
