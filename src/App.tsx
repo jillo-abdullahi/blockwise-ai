@@ -137,17 +137,21 @@ function App() {
                       : 'border-gray-600 focus:ring-blue-500'
                   }`}
                 />
-                {validationError && (
-                  <p className="mt-2 text-sm text-red-400">{validationError}</p>
-                )}
+                <div className="h-6 mt-2">
+                  {validationError && (
+                    <p className="text-sm text-red-400">{validationError}</p>
+                  )}
+                </div>
               </div>
-              <button
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                onClick={handleAnalyzeWallet}
-                disabled={isAnalyzing || !walletAddress.trim()}
-              >
-                {isAnalyzing ? "Analyzing..." : "Analyze Wallet"}
-              </button>
+              <div className="sm:flex sm:items-start">
+                <button
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  onClick={handleAnalyzeWallet}
+                  disabled={isAnalyzing || !walletAddress.trim()}
+                >
+                  {isAnalyzing ? "Analyzing..." : "Analyze Wallet"}
+                </button>
+              </div>
             </div>
           </div>
 
