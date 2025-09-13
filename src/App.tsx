@@ -3,14 +3,17 @@ import { isAddress } from "ethers";
 import Navbar from "./components/Navbar";
 import AnalysisModal from "./components/AnalysisModal";
 import { useWalletTransactions } from "./hooks/useEtherscan";
+import { isValidENSName, resolveENSName } from "./services/ensService";
 import type { WalletAnalysis } from "./services/openaiApi";
 
 function App() {
-  const [walletAddress, setWalletAddress] = useState("");
+  const [walletInput, setWalletInput] = useState(""); // What user types (address or ENS)
   const [analyzedAddress, setAnalyzedAddress] = useState("");
   const [validationError, setValidationError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState<WalletAnalysis | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<WalletAnalysis | null>(
+    null
+  );
 
   const {
     data: transactions,
@@ -27,25 +30,45 @@ function App() {
     }
   }, [transactions]);
 
-  const validateAddress = (address: string): boolean => {
-    if (!address.trim()) {
-      setValidationError("Please enter an Ethereum address");
-      return false;
+  const validateAndResolveInput = async (input: string): Promise<{ isValid: boolean; address?: string; error?: string }> => {
+    if (!input.trim()) {
+      return { isValid: false, error: "Please enter an Ethereum address or ENS name" };
     }
 
-    if (!isAddress(address)) {
-      setValidationError("Please enter a valid Ethereum address");
-      return false;
+    // Check if it's a valid Ethereum address
+    if (isAddress(input)) {
+      return { isValid: true, address: input };
     }
 
-    setValidationError("");
-    return true;
+    // Check if it's a valid ENS name
+    if (isValidENSName(input)) {
+      try {
+        const result = await resolveENSName(input);
+        if (result.isValid && result.address) {
+          return { isValid: true, address: result.address };
+        } else {
+          return { isValid: false, error: result.error || "Failed to resolve ENS name. Please check the name and try again." };
+        }
+      } catch (error) {
+        return { isValid: false, error: "Failed to resolve ENS name. Please check the name and try again." };
+      }
+    }
+
+    return { 
+      isValid: false, 
+      error: "Please enter a valid Ethereum address or ENS name (e.g., vitalik.eth)" 
+    };
   };
 
-  const handleAnalyzeWallet = () => {
-    if (validateAddress(walletAddress)) {
-      setAnalyzedAddress(walletAddress);
+  const handleAnalyzeWallet = async () => {
+    setValidationError(""); // Clear any previous errors
+    
+    const result = await validateAndResolveInput(walletInput);
+    if (result.isValid && result.address) {
+      setAnalyzedAddress(result.address);
       setAnalysisResults(null); // Clear previous results
+    } else {
+      setValidationError(result.error || "Invalid input");
     }
   };
 
@@ -57,8 +80,8 @@ function App() {
     setIsModalOpen(false);
   };
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setWalletAddress(e.target.value);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setWalletInput(e.target.value);
     // Clear validation error when user starts typing
     if (validationError) {
       setValidationError("");
@@ -78,21 +101,23 @@ function App() {
           <p className="text-xl text-gray-300 mb-12 leading-relaxed">
             Get AI-powered insights into Ethereum wallet activity. Analyze
             transaction patterns, portfolio performance, and blockchain
-            interactions with smart analytics.
+            interactions with smart analytics. Supports both wallet addresses
+            and ENS names.
           </p>
 
           {/* Wallet Input Section */}
           <div className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-3xl p-8 mb-8">
             <h2 className="text-2xl font-semibold text-white mb-6">
-              Enter Ethereum Address
+              Enter Ethereum Address or ENS Name
             </h2>
+
             <div className="flex flex-col sm:flex-row gap-4 max-w-2xl mx-auto">
               <div className="flex-1">
                 <input
                   type="text"
-                  placeholder="0x742d35Cc6634C0532925a3b8D25d9E6c0e5c8C8E"
-                  value={walletAddress}
-                  onChange={handleAddressChange}
+                  placeholder="0x742d...8C8E or vitalik.eth"
+                  value={walletInput}
+                  onChange={handleInputChange}
                   className={`w-full px-4 py-3 bg-slate-700/50 border rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
                     validationError
                       ? "border-red-500 focus:ring-red-500"
@@ -101,7 +126,9 @@ function App() {
                 />
                 <div className="h-6 mt-2">
                   {validationError && (
-                    <p className="text-sm text-red-400">{validationError}</p>
+                    <p className="text-sm text-red-400">
+                      {validationError}
+                    </p>
                   )}
                 </div>
               </div>
@@ -109,7 +136,7 @@ function App() {
                 <button
                   className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   onClick={handleAnalyzeWallet}
-                  disabled={isAnalyzing || !walletAddress.trim()}
+                  disabled={isAnalyzing || !walletInput.trim()}
                 >
                   {isAnalyzing ? "Analyzing..." : "Analyze Wallet"}
                 </button>
@@ -139,12 +166,17 @@ function App() {
                       Key Insights
                     </h3>
                     <ul className="space-y-2">
-                      {analysisResults.insights.map((insight: string, index: number) => (
-                        <li key={index} className="flex items-start space-x-2">
-                          <span className="text-purple-400 mt-1">•</span>
-                          <span className="text-gray-300">{insight}</span>
-                        </li>
-                      ))}
+                      {analysisResults.insights.map(
+                        (insight: string, index: number) => (
+                          <li
+                            key={index}
+                            className="flex items-start space-x-2"
+                          >
+                            <span className="text-purple-400 mt-1">•</span>
+                            <span className="text-gray-300">{insight}</span>
+                          </li>
+                        )
+                      )}
                     </ul>
                   </div>
 
@@ -153,7 +185,9 @@ function App() {
                     <h3 className="text-lg font-semibold text-green-400 mb-2">
                       Behavior Pattern
                     </h3>
-                    <p className="text-gray-300">{analysisResults.behaviorPattern}</p>
+                    <p className="text-gray-300">
+                      {analysisResults.behaviorPattern}
+                    </p>
                   </div>
 
                   {/* Risk Assessment */}
@@ -161,7 +195,9 @@ function App() {
                     <h3 className="text-lg font-semibold text-yellow-400 mb-2">
                       Risk Assessment
                     </h3>
-                    <p className="text-gray-300">{analysisResults.riskAssessment}</p>
+                    <p className="text-gray-300">
+                      {analysisResults.riskAssessment}
+                    </p>
                   </div>
 
                   {/* Recommendations */}
@@ -170,12 +206,17 @@ function App() {
                       Recommendations
                     </h3>
                     <ul className="space-y-2">
-                      {analysisResults.recommendations.map((rec: string, index: number) => (
-                        <li key={index} className="flex items-start space-x-2">
-                          <span className="text-cyan-400 mt-1">→</span>
-                          <span className="text-gray-300">{rec}</span>
-                        </li>
-                      ))}
+                      {analysisResults.recommendations.map(
+                        (rec: string, index: number) => (
+                          <li
+                            key={index}
+                            className="flex items-start space-x-2"
+                          >
+                            <span className="text-cyan-400 mt-1">→</span>
+                            <span className="text-gray-300">{rec}</span>
+                          </li>
+                        )
+                      )}
                     </ul>
                   </div>
                 </div>
@@ -187,7 +228,7 @@ function App() {
                     Error
                   </h3>
                   <p className="text-red-300 text-sm">
-                    {transactionError.message || 'Failed to fetch wallet data'}
+                    {transactionError.message || "Failed to fetch wallet data"}
                   </p>
                 </div>
               </div>
@@ -212,7 +253,8 @@ function App() {
                   No Analysis Yet
                 </h3>
                 <p className="text-gray-500">
-                  Enter an Ethereum wallet address above and click "Analyze Wallet" to see AI-powered insights.
+                  Enter an Ethereum wallet address or ENS name above and click
+                  "Analyze Wallet" to see AI-powered insights.
                 </p>
               </div>
             )}
