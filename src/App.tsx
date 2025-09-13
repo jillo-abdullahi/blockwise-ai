@@ -1,18 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { isAddress } from "ethers";
 import Navbar from "./components/Navbar";
-import { useWalletTransactions } from "./hooks/useEtherscan";
+import { useWalletTransactions, useWalletAnalysis } from "./hooks/useEtherscan";
 
 function App() {
   const [walletAddress, setWalletAddress] = useState("");
   const [analyzedAddress, setAnalyzedAddress] = useState("");
+  const [shouldAnalyze, setShouldAnalyze] = useState(false);
   const [validationError, setValidationError] = useState("");
 
   const { 
     data: transactions, 
-    isLoading: isAnalyzing, 
-    error 
+    isLoading: isLoadingTransactions, 
+    error: transactionError 
   } = useWalletTransactions(analyzedAddress, !!analyzedAddress);
+
+  const { 
+    data: aiAnalysis, 
+    isLoading: isLoadingAnalysis, 
+    error: analysisError 
+  } = useWalletAnalysis(transactions, analyzedAddress, shouldAnalyze && !!transactions);
+
+  const isAnalyzing = isLoadingTransactions || isLoadingAnalysis;
+
+  // Reset analysis flag when address changes
+  useEffect(() => {
+    setShouldAnalyze(false);
+  }, [analyzedAddress]);
 
   const validateAddress = (address: string): boolean => {
     if (!address.trim()) {
@@ -32,6 +46,7 @@ function App() {
   const handleAnalyzeWallet = () => {
     if (validateAddress(walletAddress)) {
       setAnalyzedAddress(walletAddress);
+      setShouldAnalyze(true);
     }
   };
 
@@ -41,66 +56,6 @@ function App() {
     if (validationError) {
       setValidationError("");
     }
-  };
-
-  const formatTransactionValue = (valueWei: string) => {
-    const ethValue = parseFloat(valueWei) / Math.pow(10, 18);
-    return ethValue.toFixed(6);
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(parseInt(timestamp) * 1000).toLocaleString();
-  };
-
-  const generateAnalysisResults = () => {
-    if (!transactions) return null;
-
-    const totalTransactions = transactions.length;
-    const recentTransactions = transactions.slice(0, 10);
-    
-    let analysisText = `WALLET ANALYSIS RESULTS\n`;
-    analysisText += `========================\n\n`;
-    analysisText += `Address: ${analyzedAddress}\n`;
-    analysisText += `Total Transactions Found: ${totalTransactions}\n\n`;
-    
-    if (totalTransactions > 0) {
-      const totalValueOut = transactions
-        .filter(tx => tx.from.toLowerCase() === analyzedAddress.toLowerCase())
-        .reduce((sum, tx) => sum + parseFloat(tx.value), 0);
-      
-      const totalValueIn = transactions
-        .filter(tx => tx.to.toLowerCase() === analyzedAddress.toLowerCase())
-        .reduce((sum, tx) => sum + parseFloat(tx.value), 0);
-
-      const outgoingTxCount = transactions.filter(tx => tx.from.toLowerCase() === analyzedAddress.toLowerCase()).length;
-      const incomingTxCount = transactions.filter(tx => tx.to.toLowerCase() === analyzedAddress.toLowerCase()).length;
-
-      analysisText += `TRANSACTION SUMMARY:\n`;
-      analysisText += `- Outgoing Transactions: ${outgoingTxCount}\n`;
-      analysisText += `- Incoming Transactions: ${incomingTxCount}\n`;
-      analysisText += `- Total ETH Sent: ${formatTransactionValue(totalValueOut.toString())} ETH\n`;
-      analysisText += `- Total ETH Received: ${formatTransactionValue(totalValueIn.toString())} ETH\n`;
-      analysisText += `- Most Recent Transaction: ${formatTimestamp(transactions[0].timeStamp)}\n\n`;
-      
-      analysisText += `RECENT TRANSACTIONS (Last 10):\n`;
-      analysisText += `====================================\n`;
-      
-      recentTransactions.forEach((tx, index) => {
-        const isOutgoing = tx.from.toLowerCase() === analyzedAddress.toLowerCase();
-        const direction = isOutgoing ? "OUT" : "IN ";
-        const otherAddress = isOutgoing ? tx.to : tx.from;
-        const value = formatTransactionValue(tx.value);
-        
-        analysisText += `${index + 1}. [${direction}] ${value} ETH\n`;
-        analysisText += `   ${isOutgoing ? 'To' : 'From'}: ${otherAddress}\n`;
-        analysisText += `   Date: ${formatTimestamp(tx.timeStamp)}\n`;
-        analysisText += `   Hash: ${tx.hash}\n\n`;
-      });
-    } else {
-      analysisText += `No transactions found for this address.\n`;
-    }
-
-    return analysisText;
   };
 
   return (
@@ -120,7 +75,7 @@ function App() {
           </p>
 
           {/* Wallet Input Section */}
-          <div className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-2xl p-8 mb-8">
+          <div className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-3xl p-8 mb-8">
             <h2 className="text-2xl font-semibold text-white mb-6">
               Enter Ethereum Address
             </h2>
@@ -131,7 +86,7 @@ function App() {
                   placeholder="0x742d35Cc6634C0532925a3b8D25d9E6c0e5c8C8E"
                   value={walletAddress}
                   onChange={handleAddressChange}
-                  className={`w-full px-4 py-3 bg-slate-700/50 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+                  className={`w-full px-4 py-3 bg-slate-700/50 border rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
                     validationError 
                       ? 'border-red-500 focus:ring-red-500' 
                       : 'border-gray-600 focus:ring-blue-500'
@@ -145,7 +100,7 @@ function App() {
               </div>
               <div className="sm:flex sm:items-start">
                 <button
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   onClick={handleAnalyzeWallet}
                   disabled={isAnalyzing || !walletAddress.trim()}
                 >
@@ -156,29 +111,99 @@ function App() {
           </div>
 
           {/* Analysis Results Section */}
-          <div className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-2xl p-8">
-            <h2 className="text-2xl font-semibold text-white mb-6">Analysis Results</h2>
+          <div className="bg-slate-800/50 backdrop-blur-lg border border-purple-500/20 rounded-3xl p-8">
+            <h2 className="text-2xl font-semibold text-white mb-6">AI-Powered Analysis Results</h2>
             
-            {error ? (
+            {transactionError || analysisError ? (
               <div className="text-center py-6">
-                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
                   <h3 className="text-lg font-medium text-red-400 mb-2">Error</h3>
                   <p className="text-red-300 text-sm">
-                    {error.message || 'Failed to fetch wallet data'}
+                    {analysisError?.message?.includes('429') ? 
+                      'Rate limit exceeded. Please wait a moment before trying again.' :
+                      transactionError?.message || analysisError?.message || 'Failed to analyze wallet'
+                    }
                   </p>
+                  {analysisError?.message?.includes('429') && (
+                    <p className="text-red-300 text-xs mt-2">
+                      The AI analysis service is temporarily unavailable due to high demand.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : aiAnalysis ? (
+              <div className="text-left space-y-6">
+                {/* Summary */}
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-blue-400 mb-2">Summary</h3>
+                  <p className="text-gray-300">{aiAnalysis.summary}</p>
+                </div>
+
+                {/* Key Insights */}
+                <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-purple-400 mb-3">Key Insights</h3>
+                  <ul className="space-y-2">
+                    {aiAnalysis.insights.map((insight, index) => (
+                      <li key={index} className="flex items-start space-x-2">
+                        <span className="text-purple-400 mt-1">•</span>
+                        <span className="text-gray-300">{insight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Behavior Pattern */}
+                <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-green-400 mb-2">Behavior Pattern</h3>
+                  <p className="text-gray-300">{aiAnalysis.behaviorPattern}</p>
+                </div>
+
+                {/* Risk Assessment */}
+                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-yellow-400 mb-2">Risk Assessment</h3>
+                  <p className="text-gray-300">{aiAnalysis.riskAssessment}</p>
+                </div>
+
+                {/* Recommendations */}
+                <div className="bg-cyan-900/20 border border-cyan-500/30 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-cyan-400 mb-3">Recommendations</h3>
+                  <ul className="space-y-2">
+                    {aiAnalysis.recommendations.map((rec, index) => (
+                      <li key={index} className="flex items-start space-x-2">
+                        <span className="text-cyan-400 mt-1">→</span>
+                        <span className="text-gray-300">{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : transactions && !shouldAnalyze ? (
+              <div className="text-center py-6">
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+                  <h3 className="text-lg font-medium text-blue-400 mb-2">Transactions Loaded</h3>
+                  <p className="text-gray-300 text-sm mb-3">
+                    Found {transactions.length} transactions. Click "Analyze Wallet" above to get AI insights.
+                  </p>
+                  <button
+                    onClick={() => setShouldAnalyze(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors"
+                  >
+                    Analyze with AI
+                  </button>
                 </div>
               </div>
             ) : transactions ? (
-              <div className="text-left">
-                <div className="bg-slate-700/30 rounded-lg p-6 border border-gray-600">
-                  <pre className="text-gray-300 whitespace-pre-wrap font-mono text-sm leading-relaxed">
-                    {generateAnalysisResults()}
-                  </pre>
+              <div className="text-center py-6">
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+                  <h3 className="text-lg font-medium text-blue-400 mb-2">Analyzing with AI...</h3>
+                  <p className="text-gray-300 text-sm">
+                    Found {transactions.length} transactions. Running AI analysis...
+                  </p>
                 </div>
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gradient-to-br from-gray-600 to-gray-700 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                <div className="w-16 h-16 bg-gradient-to-br from-gray-600 to-gray-700 rounded-xl flex items-center justify-center mb-4 mx-auto">
                   <svg
                     className="w-8 h-8 text-gray-400"
                     fill="none"
